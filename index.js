@@ -2,7 +2,7 @@ require('dotenv').config();
 const express = require('express')
 const app = express()
 const cors = require('cors');
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 app.use(cors());
 app.use(express.json());
 const port = process.env.PORT || 5000;
@@ -30,6 +30,29 @@ async function run() {
     const reviewsCollection = database.collection('reviews')
     const claimsCollection = database.collection('claims')
 
+    app.post('/applications', async (req, res) => {
+      const applicationData = req.body;
+
+      if (!applicationData?.email || !applicationData?.name) {
+        return res.status(400).send({ message: "Missing required fields" });
+      }
+
+      applicationData.status = "Pending";
+      applicationData.appliedAt = new Date();
+
+      const result = await applicationsCollection.insertOne(applicationData);
+      res.send(result);
+    });
+   
+    app.get("/policies/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
+    const policy = await policiesCollection.findOne({ _id: new ObjectId(id) });
+    res.send(policy);
+  } catch (error) {
+    res.status(500).send({ message: "Failed to fetch policy", error });
+  }
+});
 
     app.get('/policies', async (req, res) => {
   try {
