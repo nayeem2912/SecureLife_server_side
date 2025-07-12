@@ -82,6 +82,56 @@ async function run() {
   }
 });
 
+// Get User Role by Email
+app.get('/users/role/:email', async (req, res) => {
+  const email = req.params.email;
+
+  try {
+    if (!email) {
+      return res.status(400).json({ message: 'Email is required' });
+    }
+
+    const user = await userCollection.findOne({ email });
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.json({ role: user.role });
+  } catch (error) {
+    console.error('Error fetching user role:', error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+});
+
+
+  app.post("/users", async (req, res) => {
+  try {
+    const user = req.body;
+
+    if (!user?.email ) {
+      return res.status(400).send({ message: "Name and email are required" });
+    }
+
+    // Check if user already exists
+    const existingUser = await userCollection.findOne({ email: user.email });
+    if (existingUser) {
+      return res.status(409).send({ message: "User already exists" });
+    }
+
+    user.status = "active";
+
+    const result = await userCollection.insertOne(user);
+    res.send(result);
+
+  } catch (error) {
+    console.error("Error creating user:", error);
+    res.status(500).send({ message: "Server error. Please try again later." });
+  }
+});
+
+
+
 
 
 
