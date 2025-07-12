@@ -104,6 +104,42 @@ app.get('/users/role/:email', async (req, res) => {
   }
 });
 
+app.get("/blogs/:id", async (req, res) => {
+  try {
+    const blog = await blogsCollection.findOne({ _id: new ObjectId(req.params.id) });
+    res.send(blog);
+  } catch (err) {
+    res.status(500).send({ message: "Failed to fetch blog" });
+  }
+});
+
+
+app.get("/blogs", async (req, res) => {
+  try {
+    const blogs = await blogsCollection.find().sort({ publishDate: -1 }).toArray();
+    res.send(blogs);
+  } catch (err) {
+    res.status(500).send({ message: "Failed to fetch blogs" });
+  }
+});
+
+app.patch("/blogs/:id/visit", async (req, res) => {
+  try {
+    const id = req.params.id;
+    const blog = await blogsCollection.findOne({ _id: new ObjectId(id) });
+
+    if (!blog) return res.status(404).send({ message: "Blog not found" });
+
+    const updated = await blogsCollection.updateOne(
+      { _id: new ObjectId(id) },
+      { $inc: { visits: 1 } }
+    );
+    res.send(updated);
+  } catch (err) {
+    res.status(500).send({ message: "Failed to update visits" });
+  }
+});
+
 
   app.post("/users", async (req, res) => {
   try {
