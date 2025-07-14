@@ -22,7 +22,7 @@ async function run() {
     
      const database = client.db('secure_life')
     const massageCollection = database.collection('massage')
-    const userCollection = database.collection('user')
+    const userCollection = database.collection('users')
     const policiesCollection = database.collection('policies')
     const applicationsCollection = database.collection('applications')
     const transactionsCollection = database.collection('transactions')
@@ -30,6 +30,7 @@ async function run() {
     const reviewsCollection = database.collection('reviews')
     const claimsCollection = database.collection('claims')
     const quotesCollection = database.collection('quotes')
+    
 
 
 
@@ -78,6 +79,16 @@ app.get("/quotes", async (req, res) => {
   }
 });
 
+app.get("/users", async (req, res) => {
+  try {
+    const result = await userCollection.find().toArray();
+    res.send(result);
+  } catch (err) {
+    res.status(500).send({ message: "Failed to fetch users" });
+  }
+});
+
+
 
 
 app.get('/users/agents', async (req, res) => {
@@ -99,6 +110,17 @@ app.get('/users/agents', async (req, res) => {
     res.status(500).send({ message: "Failed to fetch policy", error });
   }
 });
+
+
+app.get("/policy", async (req, res) => {
+  try {
+    const policies = await policiesCollection.find().toArray();
+    res.send(policies);
+  } catch (error) {
+    res.status(500).send({ message: "Failed to fetch policies", error });
+  }
+});
+
 
     app.get('/policies', async (req, res) => {
   try {
@@ -185,6 +207,40 @@ app.patch("/blogs/:id/visit", async (req, res) => {
     res.status(500).send({ message: "Failed to update visits" });
   }
 });
+
+// server.js or routes file
+
+app.patch("/applications/:id/reject", async (req, res) => {
+  const { id } = req.params;
+  const { reason } = req.body;
+
+  if (!reason) {
+    return res.status(400).send({ message: "Rejection reason is required" });
+  }
+
+  try {
+    const result = await applicationsCollection.updateOne(
+      { _id: new ObjectId(id) },
+      {
+        $set: {
+          status: "Rejected",
+          adminFeedback: reason,
+          rejectedAt: new Date()
+        }
+      }
+    );
+
+    if (result.modifiedCount === 0) {
+      return res.status(404).send({ message: "Application not found or already rejected" });
+    }
+
+    res.send({ message: "Application rejected successfully" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).send({ message: "Failed to reject application" });
+  }
+});
+
 
 // server.js or routes/reviews.js
 app.post("/reviews", async (req, res) => {
@@ -303,6 +359,35 @@ app.patch('/applications/:id/reject', async (req, res) => {
     res.status(500).send({ message: 'Failed to reject application' });
   }
 });
+app.patch("/users/promote/:id", async (req, res) => {
+  const id = req.params.id;
+
+  try {
+    const result = await userCollection.updateOne(
+      { _id: new ObjectId(id), role: "user" },
+      { $set: { role: "agent" } }
+    );
+    res.send(result);
+  } catch (err) {
+    res.status(500).send({ message: "Failed to promote user" });
+  }
+});
+
+// PATCH demote agent to customer
+app.patch("/users/demote/:id", async (req, res) => {
+  const id = req.params.id;
+
+  try {
+    const result = await userCollection.updateOne(
+      { _id: new ObjectId(id), role: "agent" },
+      { $set: { role: "user" } }
+    );
+    res.send(result);
+  } catch (err) {
+    res.status(500).send({ message: "Failed to demote user" });
+  }
+});
+
 
 
 
