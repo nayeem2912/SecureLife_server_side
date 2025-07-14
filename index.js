@@ -7,9 +7,9 @@ app.use(cors());
 app.use(express.json());
 const port = process.env.PORT || 5000;
 
+const uri=`mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.6ww4e81.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`
 
-
-const client = new MongoClient(process.env.URI, {
+const client = new MongoClient(uri, {
   serverApi: {
     version: ServerApiVersion.v1,
     strict: true,
@@ -29,21 +29,67 @@ async function run() {
     const blogsCollection = database.collection('blogs')
     const reviewsCollection = database.collection('reviews')
     const claimsCollection = database.collection('claims')
+    const quotesCollection = database.collection('quotes')
 
-    app.post('/applications', async (req, res) => {
-      const applicationData = req.body;
 
-      if (!applicationData?.email || !applicationData?.name) {
-        return res.status(400).send({ message: "Missing required fields" });
-      }
 
-      applicationData.status = "Pending";
-      applicationData.appliedAt = new Date();
 
-      const result = await applicationsCollection.insertOne(applicationData);
-      res.send(result);
-    });
-   
+app.get("/applications/user/:email", async (req, res) => {
+  const email = req.params.email;
+
+  try {
+    const applications = await applicationsCollection
+      .find({ email })
+      .sort({ appliedAt: -1 })
+      .toArray();
+
+    res.send(applications);
+  } catch (error) {
+    res.status(500).send({ message: "Failed to fetch applications" });
+  }
+});
+
+  
+
+    app.get('/applications', async (req, res) => {
+  try {
+    const result = await applicationsCollection.find().toArray();
+    res.send(result);
+  } catch (err) {
+    res.status(500).send({ message: 'Failed to fetch applications' });
+  }
+});
+
+
+app.get("/quotes", async (req, res) => {
+  const { policyId, email } = req.query;
+
+  try {
+    const quote = await database
+      .collection("quotes")
+      .find({ policyId, email })
+      .sort({ createdAt: -1 }) 
+      .limit(1)
+      .toArray();
+
+    res.send(quote[0] || {}); 
+  } catch (err) {
+    res.status(500).send({ message: "Failed to fetch quote" });
+  }
+});
+
+
+
+app.get('/users/agents', async (req, res) => {
+  try {
+    const agents = await userCollection.find({ role: "agent" }).toArray();
+    res.send(agents);
+  } catch (err) {
+    res.status(500).send({ message: "Failed to fetch agents" });
+  }
+});
+
+    
     app.get("/policies/:id", async (req, res) => {
   try {
     const id = req.params.id;
@@ -140,6 +186,57 @@ app.patch("/blogs/:id/visit", async (req, res) => {
   }
 });
 
+// server.js or routes/reviews.js
+app.post("/reviews", async (req, res) => {
+  try {
+    const review = req.body;
+
+    if (!review.email || !review.policyName || !review.rating || !review.feedback) {
+      return res.status(400).send({ message: "Missing required fields" });
+    }
+
+    review.createdAt = new Date();
+
+    const result = await reviewsCollection.insertOne(review);
+    res.send(result);
+  } catch (err) {
+    console.error("Failed to save review:", err);
+    res.status(500).send({ message: "Failed to save review" });
+  }
+});
+
+
+app.post('/applications', async (req, res) => {
+      const applicationData = req.body;
+
+      if (!applicationData?.email || !applicationData?.name) {
+        return res.status(400).send({ message: "Missing required fields" });
+      }
+
+      applicationData.status = "Pending";
+      applicationData.appliedAt = new Date();
+
+      const result = await applicationsCollection.insertOne(applicationData);
+      res.send(result);
+    });
+
+    app.post("/quotes", async (req, res) => {
+  const quoteData = req.body;
+
+  try {
+    quoteData.createdAt = new Date();
+
+    const result = await quotesCollection.insertOne(quoteData);
+
+    res.status(201).send({ message: "Quote saved", insertedId: result.insertedId });
+  } catch (error) {
+    console.error("Error saving quote:", error);
+    res.status(500).send({ message: "Server error while saving quote" });
+  }
+});
+
+   
+
 
   app.post("/users", async (req, res) => {
   try {
@@ -165,6 +262,48 @@ app.patch("/blogs/:id/visit", async (req, res) => {
     res.status(500).send({ message: "Server error. Please try again later." });
   }
 });
+
+app.patch('/applications/:id/assign', async (req, res) => {
+  const appId = req.params.id;
+  const { agentEmail } = req.body;
+
+  try {
+    const result = await applicationsCollection.updateOne(
+      { _id: new ObjectId(appId) },
+      {
+        $set: {
+          agentEmail,
+          status: "Approved", // You can change this logic if needed
+          assignedAt: new Date(),
+        },
+      }
+    );
+    res.send(result);
+  } catch (err) {
+    res.status(500).send({ message: 'Failed to assign agent' });
+  }
+});
+
+
+app.patch('/applications/:id/reject', async (req, res) => {
+  const appId = req.params.id;
+
+  try {
+    const result = await applicationsCollection.updateOne(
+      { _id: new ObjectId(appId) },
+      {
+        $set: {
+          status: "Rejected",
+          rejectedAt: new Date(),
+        },
+      }
+    );
+    res.send(result);
+  } catch (err) {
+    res.status(500).send({ message: 'Failed to reject application' });
+  }
+});
+
 
 
 
