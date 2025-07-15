@@ -7,6 +7,8 @@ app.use(cors());
 app.use(express.json());
 const port = process.env.PORT || 5000;
 
+const stripe = require('stripe')(process.env.PAYMENT_GATEWAY_KEY);
+
 const uri=`mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.6ww4e81.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`
 
 const client = new MongoClient(uri, {
@@ -50,6 +52,23 @@ app.get("/applications/user/:email", async (req, res) => {
   }
 });
 
+app.get("/applications/:id", async (req, res) => {
+  const id = req.params.id;
+
+  try {
+    const application = await applicationsCollection.findOne({ _id: new ObjectId(id) });
+
+    if (!application) {
+      return res.status(404).send({ message: "Application not found" });
+    }
+
+    res.send(application);
+  } catch (err) {
+    res.status(500).send({ message: "Failed to fetch application", error: err });
+  }
+});
+
+
   
 
     app.get('/applications', async (req, res) => {
@@ -60,6 +79,19 @@ app.get("/applications/user/:email", async (req, res) => {
     res.status(500).send({ message: 'Failed to fetch applications' });
   }
 });
+
+app.get("/applications/assigned/:email", async (req, res) => {
+  const email = req.params.agentEmail;
+  try {
+    const result = await 
+      applicationsCollection.find({ assignedAgent: email })
+      .toArray();
+    res.send(result);
+  } catch (error) {
+    res.status(500).send({ message: "Failed to fetch assigned applications", error });
+  }
+});
+
 
 
 app.get("/quotes", async (req, res) => {
@@ -150,6 +182,25 @@ app.get("/policy", async (req, res) => {
   }
 });
 
+app.get("/users/:email", async (req, res) => {
+  const email = req.params.email;
+
+  try {
+    const user = await userCollection.findOne({ email });
+    res.send(user);
+  } catch (error) {
+    res.status(500).send({ message: "Failed to fetch user profile", error });
+  }
+});
+
+app.get("/claims/user/:email", async (req, res) => {
+  const email = req.params.email;
+  const claims = await claimsCollection.find({ userEmail: email }).toArray();
+  res.send(claims);
+});
+
+
+
 // Get User Role by Email
 app.get('/users/role/:email', async (req, res) => {
   const email = req.params.email;
@@ -171,6 +222,17 @@ app.get('/users/role/:email', async (req, res) => {
     res.status(500).json({ message: 'Internal Server Error' });
   }
 });
+
+app.get('/blogs/agent/:email', async (req, res) => {
+  const email = req.params.email;
+  try {
+    const blogs = await blogsCollection.find({ email }).toArray();
+    res.send(blogs);
+  } catch (error) {
+    res.status(500).send({ message: 'Failed to fetch blogs' });
+  }
+});
+
 
 app.get("/blogs/:id", async (req, res) => {
   try {
@@ -319,46 +381,146 @@ app.post('/applications', async (req, res) => {
   }
 });
 
-app.patch('/applications/:id/assign', async (req, res) => {
-  const appId = req.params.id;
-  const { agentEmail } = req.body;
+app.post('/blogs', async (req, res) => {
+  const blog = req.body;
+  try {
+    const result = await blogsCollection.insertOne(blog);
+    res.send(result);
+  } catch (error) {
+    res.status(500).send({ message: 'Failed to create blog' });
+  }
+});
+
+// Route: POST /create-payment-intent
+app.post("/create-payment-intent", async (req, res) => {
+  const { amount } = req.body;
+
+  if (!amount || amount < 100) {
+    return res.status(400).send({ error: "Invalid amount" });
+  }
 
   try {
-    const result = await applicationsCollection.updateOne(
-      { _id: new ObjectId(appId) },
-      {
-        $set: {
-          agentEmail,
-          status: "Approved", // You can change this logic if needed
-          assignedAt: new Date(),
-        },
-      }
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: amount,
+      currency: "bdt",
+      payment_method_types: ["card"],
+    });
+
+    res.send({ clientSecret: paymentIntent.client_secret });
+  } catch (err) {
+    console.error("Stripe Error:", err.message);
+    res.status(500).send({ error: err.message });
+  }
+});
+app.post("/claims", async (req, res) => {
+  const claim = req.body;
+  const result = await claimsCollection.insertOne(claim);
+  res.send(result);
+});
+
+app.patch("/claims/:id", async (req, res) => {
+  const id = req.params.id;
+  const { status } = req.body;
+  const result = await claimsCollection.updateOne(
+    { _id: new ObjectId(id) },
+    { $set: { status } }
+  );
+  res.send(result);
+});
+
+
+
+app.patch('/blogs/:id', async (req, res) => {
+  const id = req.params.id;
+  const updatedBlog = req.body;
+
+  try {
+    const result = await blogsCollection.updateOne(
+      { _id: new ObjectId(id) },
+      { $set: updatedBlog }
     );
     res.send(result);
-  } catch (err) {
-    res.status(500).send({ message: 'Failed to assign agent' });
+  } catch (error) {
+    res.status(500).send({ message: 'Failed to update blog' });
   }
 });
 
 
-app.patch('/applications/:id/reject', async (req, res) => {
-  const appId = req.params.id;
+
+
+
+app.patch("/applications/:id/status", async (req, res) => {
+  const id = req.params.id;
+  const { status } = req.body;
+
+  try {
+    // Update application status
+    const updateRes = await applicationsCollection.updateOne(
+      { _id: new ObjectId(id) },
+      { $set: { status } }
+    );
+
+    // If status is approved, increase purchase count of the related policy
+    if (status === "Approved") {
+      const application = await applicationsCollection.findOne({ _id: new ObjectId(id) });
+      if (application?.policyId) {
+        await policiesCollection.updateOne(
+          { _id: new ObjectId(application.policyId) },
+          { $inc: { purchaseCount: 1 } }
+        );
+      }
+    }
+
+    res.send(updateRes);
+  } catch (error) {
+    res.status(500).send({ message: "Failed to update status", error });
+  }
+});
+
+// Route: PATCH /applications/:id/pay
+app.patch("/applications/:id/pay", async (req, res) => {
+  const { id } = req.params;
+  const { transactionId } = req.body;
 
   try {
     const result = await applicationsCollection.updateOne(
-      { _id: new ObjectId(appId) },
+      { _id: new ObjectId(id) },
       {
         $set: {
-          status: "Rejected",
-          rejectedAt: new Date(),
+          paymentStatus: "Paid",
+          transactionId,
+          paymentDate: new Date(),
         },
       }
     );
     res.send(result);
-  } catch (err) {
-    res.status(500).send({ message: 'Failed to reject application' });
+  } catch (error) {
+    res.status(500).send({ error: "Payment update failed" });
   }
 });
+
+// PATCH: Assign Agent to Application
+app.patch("/applications/:id/assign", async (req, res) => {
+  try {
+    const id = req.params.id;
+    const { agentEmail } = req.body;
+
+    const result = await applicationsCollection.updateOne(
+      { _id: new ObjectId(id) },
+      { $set: { agentEmail: agentEmail } }
+    );
+
+    if (result.modifiedCount > 0) {
+      res.send({ message: "Agent assigned successfully", success: true });
+    } else {
+      res.status(404).send({ message: "Application not found", success: false });
+    }
+  } catch (error) {
+    res.status(500).send({ message: "Server error", error });
+  }
+});
+
+
 app.patch("/users/promote/:id", async (req, res) => {
   const id = req.params.id;
 
@@ -388,6 +550,53 @@ app.patch("/users/demote/:id", async (req, res) => {
   }
 });
 
+app.patch("/policies/:id", async (req, res) => {
+  const id = req.params.id;
+  const updateData = req.body;
+
+  try {
+    const result = await policiesCollection.updateOne(
+      { _id: new ObjectId(id) },
+      { $set: updateData }
+    );
+    res.send(result);
+  } catch (error) {
+    res.status(500).send({ message: "Failed to update policy", error });
+  }
+});
+
+app.post("/policies", async (req, res) => {
+  const policy = req.body;
+
+  try {
+    const result = await policiesCollection.insertOne(policy);
+    res.send(result);
+  } catch (error) {
+    res.status(500).send({ message: "Failed to create policy", error });
+  }
+});
+
+app.delete("/policies/:id", async (req, res) => {
+  const id = req.params.id;
+
+  try {
+    const result = await policiesCollection.deleteOne({ _id: new ObjectId(id) });
+    res.send(result);
+  } catch (error) {
+    res.status(500).send({ message: "Failed to delete policy", error });
+  }
+});
+
+app.delete('/blogs/:id', async (req, res) => {
+  const id = req.params.id;
+
+  try {
+    const result = await blogsCollection.deleteOne({ _id: new ObjectId(id) });
+    res.send(result);
+  } catch (error) {
+    res.status(500).send({ message: 'Failed to delete blog' });
+  }
+});
 
 
 
