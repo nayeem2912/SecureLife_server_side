@@ -418,16 +418,6 @@ app.post("/claims", async (req, res) => {
   res.send(result);
 });
 
-app.patch("/claims/:id", async (req, res) => {
-  const id = req.params.id;
-  const { status } = req.body;
-  const result = await claimsCollection.updateOne(
-    { _id: new ObjectId(id) },
-    { $set: { status } }
-  );
-  res.send(result);
-});
-
 
 
 app.patch('/blogs/:id', async (req, res) => {
@@ -499,7 +489,7 @@ app.patch("/applications/:id/pay", async (req, res) => {
   }
 });
 
-// PATCH: Assign Agent to Application
+
 app.patch("/applications/:id/assign", async (req, res) => {
   try {
     const id = req.params.id;
