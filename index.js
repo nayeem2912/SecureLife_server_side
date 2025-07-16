@@ -179,17 +179,33 @@ app.get("/policy", async (req, res) => {
     res.status(500).send({ message: "Failed to fetch policies", error });
   }
 });
+app.get("/users/:email", async (req, res) => {
+  const email = req.params.email;
+  try {
+    const user = await userCollection.findOne({ email });
+    if (!user) {
+      return res.status(404).send({ message: "User not found" });
+    }
+    res.send(user);
+  } catch (err) {
+    res.status(500).send({ message: "Failed to fetch user", error: err.message });
+  }
+});
+
 
 
     app.get('/policies', async (req, res) => {
   try {
-    const page = parseInt(req.query.page) || 1;      
-    const limit = parseInt(req.query.limit) || 9;    
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 9;
     const skip = (page - 1) * limit;
 
     const category = req.query.category;
+    const search = req.query.search;
 
-    const query = category ? { category: category } : {};
+    const query = {};
+    if (category) query.category = category;
+    if (search) query.title = { $regex: search, $options: 'i' };
 
     const total = await policiesCollection.countDocuments(query);
     const policies = await policiesCollection
@@ -337,6 +353,27 @@ app.get("/blogs", async (req, res) => {
     res.status(500).send({ message: "Failed to fetch blogs" });
   }
 });
+
+app.patch("/users/:email", async (req, res) => {
+  const email = req.params.email;
+  const updateData = req.body;
+
+  try {
+    const result = await userCollection.updateOne(
+      { email },
+      { $set: updateData }
+    );
+
+    if (result.modifiedCount > 0) {
+      res.send({ message: "Profile updated successfully" });
+    } else {
+      res.status(400).send({ message: "No changes made or user not found" });
+    }
+  } catch (err) {
+    res.status(500).send({ message: "Failed to update user", error: err.message });
+  }
+});
+
 
 app.patch("/blogs/:id/visit", async (req, res) => {
   try {
