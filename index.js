@@ -27,7 +27,6 @@ async function run() {
     const userCollection = database.collection('users')
     const policiesCollection = database.collection('policies')
     const applicationsCollection = database.collection('applications')
-    const transactionsCollection = database.collection('transactions')
     const blogsCollection = database.collection('blogs')
     const reviewsCollection = database.collection('reviews')
     const claimsCollection = database.collection('claims')
@@ -120,6 +119,34 @@ app.get("/users", async (req, res) => {
   }
 });
 
+app.get("/agents/featured", async (req, res) => {
+  try {
+    const agents = await userCollection
+      .find({ role: "agent" })
+      .sort({ _id: -1 })
+      .limit(3)
+      .toArray();
+    res.send(agents);
+  } catch (error) {
+    res.status(500).send({ message: "Failed to fetch agents" });
+  }
+});
+
+
+// GET: Latest 5 customer reviews
+app.get("/reviews", async (req, res) => {
+  try {
+    const reviews = await reviewsCollection
+      .find()
+      .sort({ createdAt: -1 })
+      .limit(5)
+      .toArray();
+    res.send(reviews);
+  } catch (err) {
+    console.error("Error fetching reviews:", err);
+    res.status(500).send({ message: "Failed to fetch reviews" });
+  }
+});
 
 
 
@@ -232,6 +259,42 @@ app.get('/blogs/agent/:email', async (req, res) => {
     res.status(500).send({ message: 'Failed to fetch blogs' });
   }
 });
+app.get("/claims", async (req, res) => {
+  try {
+    const claims = await claimsCollection.find().sort({ _id: -1 }).toArray(); // newest first
+    res.send(claims);
+  } catch (err) {
+    res.status(500).send({ message: "Failed to fetch claims" });
+  }
+});
+
+
+// GET: Top 6 Most Purchased Policies
+app.get("/popular-policies", async (req, res) => {
+  try {
+    const popularPolicies = await applicationsCollection
+      .aggregate([
+        {
+          $group: {
+            
+            name: "$policyName",
+            purchaseCount: { $sum: 1 },
+            coverage: { $first: "$coverage" },
+            duration: { $first: "$duration" }
+          }
+        },
+        { $sort: { purchaseCount: -1 } },
+        { $limit: 6 }
+      ])
+      .toArray();
+
+    res.send(popularPolicies);
+  } catch (err) {
+    console.error("Error fetching popular policies:", err);
+    res.status(500).send({ message: "Failed to fetch policies" });
+  }
+});
+
 
 
 app.get("/blogs/:id", async (req, res) => {
@@ -242,6 +305,37 @@ app.get("/blogs/:id", async (req, res) => {
     res.status(500).send({ message: "Failed to fetch blog" });
   }
 });
+
+app.get("/transactions", async (req, res) => {
+  try {
+    const paidApps = await applicationsCollection.find({ paymentStatus: "Paid" }).toArray();
+
+    const transactions = paidApps.map(app => ({
+      transactionId: app.transactionId || "N/A",
+      email: app.email,
+      policyName: app.policyName,
+      amount: app.premium,
+      date: new Date(app.updatedAt || app.createdAt || Date.now()).toLocaleDateString(),
+      status: "Success"
+    }));
+
+    res.send(transactions);
+  } catch (error) {
+    res.status(500).send({ message: "Failed to fetch transactions" });
+  }
+});
+
+
+app.get("/transactions/total-income", async (req, res) => {
+  try {
+    const paidApps = await applicationsCollection.find({ paymentStatus: "Paid" }).toArray();
+    const total = paidApps.reduce((sum, app) => sum + parseFloat(app.premium || 0), 0);
+    res.send({ totalIncome: total });
+  } catch (error) {
+    res.status(500).send({ message: "Failed to calculate total income" });
+  }
+});
+
 
 
 app.get("/blogs", async (req, res) => {
@@ -270,7 +364,25 @@ app.patch("/blogs/:id/visit", async (req, res) => {
   }
 });
 
-// server.js or routes file
+app.patch("/claims/:id/approve", async (req, res) => {
+  const claimId = req.params.id;
+
+  try {
+    const result = await claimsCollection.updateOne(
+      { _id: new ObjectId(claimId) },
+      { $set: { status: "Approved" } }
+    );
+
+    if (result.modifiedCount > 0) {
+      res.send({ message: "Claim approved" });
+    } else {
+      res.status(404).send({ message: "Claim not found or already approved" });
+    }
+  } catch (err) {
+    res.status(500).send({ message: "Failed to approve claim" });
+  }
+});
+
 
 app.patch("/applications/:id/reject", async (req, res) => {
   const { id } = req.params;
@@ -450,7 +562,7 @@ app.patch("/applications/:id/status", async (req, res) => {
       { $set: { status } }
     );
 
-    // If status is approved, increase purchase count of the related policy
+
     if (status === "Approved") {
       const application = await applicationsCollection.findOne({ _id: new ObjectId(id) });
       if (application?.policyId) {
