@@ -272,28 +272,19 @@ app.get("/claims", async (req, res) => {
 // GET: Top 6 Most Purchased Policies
 app.get("/popular-policies", async (req, res) => {
   try {
-    const popularPolicies = await applicationsCollection
-      .aggregate([
-        {
-          $group: {
-            
-            name: "$policyName",
-            purchaseCount: { $sum: 1 },
-            coverage: { $first: "$coverage" },
-            duration: { $first: "$duration" }
-          }
-        },
-        { $sort: { purchaseCount: -1 } },
-        { $limit: 6 }
-      ])
+    const popularPolicies = await policiesCollection
+      .find({})
+      .sort({ purchaseCount: -1 }) // Sort by most purchased
+      .limit(6) // Limit to top 6
       .toArray();
 
-    res.send(popularPolicies);
+    res.status(200).send(popularPolicies);
   } catch (err) {
-    console.error("Error fetching popular policies:", err);
-    res.status(500).send({ message: "Failed to fetch policies" });
+    console.error(" Error fetching popular policies:", err);
+    res.status(500).send({ message: "Failed to fetch popular policies" });
   }
 });
+
 
 
 
