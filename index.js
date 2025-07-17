@@ -243,8 +243,6 @@ app.get("/claims/user/:email", async (req, res) => {
 });
 
 
-
-// Get User Role by Email
 app.get('/users/role/:email', async (req, res) => {
   const email = req.params.email;
 
@@ -322,7 +320,7 @@ app.get("/transactions", async (req, res) => {
       email: app.email,
       policyName: app.policyName,
       amount: app.premium,
-      date: new Date(app.updatedAt || app.createdAt || Date.now()).toLocaleDateString(),
+      date: new Date(app.paymentDate || app.createdAt || Date.now()).toLocaleDateString(),
       status: "Success"
     }));
 
@@ -354,25 +352,27 @@ app.get("/blogs", async (req, res) => {
   }
 });
 
-app.patch("/users/:email", async (req, res) => {
+app.patch('/users/:email', async (req, res) => {
   const email = req.params.email;
-  const updateData = req.body;
+  const { name, photo, last_log_in } = req.body;
+
+  const updateFields = {};
+
+  if (name) updateFields.name = name;
+  if (photo) updateFields.photo = photo;
+  if (last_log_in) updateFields.last_log_in = last_log_in;
 
   try {
     const result = await userCollection.updateOne(
       { email },
-      { $set: updateData }
+      { $set: updateFields }
     );
-
-    if (result.modifiedCount > 0) {
-      res.send({ message: "Profile updated successfully" });
-    } else {
-      res.status(400).send({ message: "No changes made or user not found" });
-    }
-  } catch (err) {
-    res.status(500).send({ message: "Failed to update user", error: err.message });
+    res.send(result);
+  } catch (error) {
+    res.status(500).send({ message: 'Failed to update user data', error: error.message });
   }
 });
+
 
 
 app.patch("/blogs/:id/visit", async (req, res) => {
