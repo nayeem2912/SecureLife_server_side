@@ -354,12 +354,12 @@ app.get("/blogs", async (req, res) => {
 
 app.patch('/users/:email', async (req, res) => {
   const email = req.params.email;
-  const { name, photo, last_log_in } = req.body;
+  const { name, photoURL, last_log_in } = req.body;
 
   const updateFields = {};
 
   if (name) updateFields.name = name;
-  if (photo) updateFields.photo = photo;
+  if (photoURL) updateFields.photoURL = photoURL;
   if (last_log_in) updateFields.last_log_in = last_log_in;
 
   try {
