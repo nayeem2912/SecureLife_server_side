@@ -133,7 +133,6 @@ app.get("/agents/featured", async (req, res) => {
 });
 
 
-// GET: Latest 5 customer reviews
 app.get("/reviews", async (req, res) => {
   try {
     const reviews = await reviewsCollection
