@@ -66,9 +66,7 @@ app.get("/applications/:id", async (req, res) => {
     res.status(500).send({ message: "Failed to fetch application", error: err });
   }
 });
-
-
-  
+ 
 
     app.get('/applications', async (req, res) => {
   try {
@@ -278,6 +276,8 @@ app.get('/blogs/agent/:email', async (req, res) => {
     res.status(500).send({ message: 'Failed to fetch blogs' });
   }
 });
+
+
 app.get("/claims", async (req, res) => {
   try {
     const claims = await claimsCollection.find().sort({ _id: -1 }).toArray(); // newest first
@@ -288,13 +288,13 @@ app.get("/claims", async (req, res) => {
 });
 
 
-// GET: Top 6 Most Purchased Policies
+
 app.get("/popular-policies", async (req, res) => {
   try {
     const popularPolicies = await policiesCollection
       .find({})
-      .sort({ purchaseCount: -1 }) // Sort by most purchased
-      .limit(6) // Limit to top 6
+      .sort({ purchaseCount: -1 }) 
+      .limit(6) 
       .toArray();
 
     res.status(200).send(popularPolicies);
@@ -303,9 +303,6 @@ app.get("/popular-policies", async (req, res) => {
     res.status(500).send({ message: "Failed to fetch popular policies" });
   }
 });
-
-
-
 
 app.get("/blogs/:id", async (req, res) => {
   try {
@@ -347,6 +344,14 @@ app.get("/transactions/total-income", async (req, res) => {
 });
 
 
+app.get("/blog", async (req, res) => {
+      const latest = await blogsCollection.find()
+        .sort({ _id: -1 })
+        .limit(4)
+        .toArray();
+      res.send(latest);
+    });
+
 
 app.get("/blogs", async (req, res) => {
   try {
@@ -356,6 +361,9 @@ app.get("/blogs", async (req, res) => {
     res.status(500).send({ message: "Failed to fetch blogs" });
   }
 });
+
+
+
 
 app.patch('/users/:email', async (req, res) => {
   const email = req.params.email;
@@ -449,7 +457,6 @@ app.patch("/applications/:id/reject", async (req, res) => {
 });
 
 
-// server.js or routes/reviews.js
 app.post("/reviews", async (req, res) => {
   try {
     const review = req.body;
@@ -509,7 +516,6 @@ app.post('/applications', async (req, res) => {
       return res.status(400).send({ message: "Name and email are required" });
     }
 
-    // Check if user already exists
     const existingUser = await userCollection.findOne({ email: user.email });
     if (existingUser) {
       return res.status(409).send({ message: "User already exists" });
@@ -536,7 +542,7 @@ app.post('/blogs', async (req, res) => {
   }
 });
 
-// Route: POST /create-payment-intent
+
 app.post("/create-payment-intent", async (req, res) => {
   const { amount } = req.body;
 
@@ -580,16 +586,12 @@ app.patch('/blogs/:id', async (req, res) => {
   }
 });
 
-
-
-
-
 app.patch("/applications/:id/status", async (req, res) => {
   const id = req.params.id;
   const { status } = req.body;
 
   try {
-    // Update application status
+    
     const updateRes = await applicationsCollection.updateOne(
       { _id: new ObjectId(id) },
       { $set: { status } }
@@ -612,7 +614,7 @@ app.patch("/applications/:id/status", async (req, res) => {
   }
 });
 
-// Route: PATCH /applications/:id/pay
+
 app.patch("/applications/:id/pay", async (req, res) => {
   const { id } = req.params;
   const { transactionId } = req.body;
@@ -670,7 +672,7 @@ app.patch("/users/promote/:id", async (req, res) => {
   }
 });
 
-// PATCH demote agent to customer
+
 app.patch("/users/demote/:id", async (req, res) => {
   const id = req.params.id;
 
@@ -733,13 +735,7 @@ app.delete('/blogs/:id', async (req, res) => {
   }
 });
 
-
-
-
-
-
-
-    app.post("/subscriptions", async (req, res) => {
+  app.post("/subscriptions", async (req, res) => {
       const { name, email } = req.body;
 
       if (!name || !email) {
