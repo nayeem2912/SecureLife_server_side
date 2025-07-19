@@ -237,8 +237,14 @@ app.get("/users/:email", async (req, res) => {
 
 app.get("/claims/user/:email", async (req, res) => {
   const email = req.params.email;
-  const claims = await claimsCollection.find({ userEmail: email }).toArray();
-  res.send(claims);
+
+  try {
+    const userClaims = await claimsCollection.find({ email }).toArray();
+    res.send(userClaims);
+  } catch (error) {
+    console.error("Failed to fetch user claims:", error);
+    res.status(500).send({ message: "Failed to fetch claims" });
+  }
 });
 
 
