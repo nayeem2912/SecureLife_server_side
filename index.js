@@ -110,12 +110,16 @@ app.get("/quotes", async (req, res) => {
 
 app.get("/users", async (req, res) => {
   try {
-    const result = await userCollection.find().toArray();
+    const result = await userCollection
+      .find({ role: { $in: ["agent", "admin"] } }) 
+      .toArray();
+
     res.send(result);
   } catch (err) {
     res.status(500).send({ message: "Failed to fetch users" });
   }
 });
+
 
 app.get("/agents/featured", async (req, res) => {
   try {
